@@ -15,6 +15,7 @@ class Stack {
     void push(const T& value);
     void pop();
     bool empty() const;
+    std::size_t size() const;
 
   private:
     T* data;
@@ -94,6 +95,11 @@ void Stack<T>::grow() {
 
     data = newData;
     cap = newCap;
+}
+
+template<typename T>
+std::size_t Stack<T>::size() const {
+    return sz;
 }
 
 #endif // STACK_HPP

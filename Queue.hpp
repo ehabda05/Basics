@@ -16,7 +16,8 @@ class Queue {
     void pop();
     bool empty() const;
     void clear();
-    
+    std::size_t size() const;
+
   private:
     struct Node {
         T val;
@@ -98,6 +99,11 @@ bool Queue<T>::empty() const {
 template<typename T>
 void Queue<T>::clear() {
     while (!empty()) pop();
+}
+
+template<typename T>
+std::size_t Queue<T>::size() const {
+    return sz;
 }
 
 #endif // QUEUE_HPP
