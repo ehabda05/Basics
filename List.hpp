@@ -21,9 +21,12 @@ class List {
     void pop_back();
     void clear();
     bool empty() const;
-    void erase(const T& value);
     std::size_t size() const;
-
+    class Iterator;
+    Iterator begin();
+    Iterator end();
+    void erase(const T& value);
+    Iterator erase(Iterator pos);
   private:
     struct Node {
         T val;
@@ -35,6 +38,36 @@ class List {
     Node* head;
     Node* tail;
     std::size_t sz;
+};
+
+template<typename T>
+class List<T>::Iterator{
+  public:
+    Iterator(Node* p) : ptr(p) {}
+    T& operator*() {
+        return ptr->val;
+    }
+    const T& operator*() const {
+        return ptr->val;
+    }
+    Iterator& operator++() {
+        ptr = ptr->next;
+        return *this;
+    }
+    Iterator& operator--() {
+        ptr = ptr->prev;
+        return *this;
+    }
+    bool operator==(const Iterator& other) const {
+        return ptr == other.ptr;
+    }
+    bool operator!=(const Iterator& other) const {
+        return ptr != other.ptr;
+    }
+
+  private:
+    Node* ptr;
+    friend class List<T>;
 };
 
 template<typename T>
@@ -147,7 +180,7 @@ void List<T>::pop_back() {
 
     if (tail != nullptr) tail->next = nullptr;
     else head = nullptr;
-    
+
     delete oldTail;
     sz--;
 }
@@ -187,6 +220,37 @@ void List<T>::erase(const T& value) {
 template<typename T>
 std::size_t List<T>::size() const {
     return sz;
+}
+
+template<typename T>
+typename List<T>::Iterator List<T>::begin() {
+    return Iterator(head);
+}
+
+template<typename T>
+typename List<T>::Iterator List<T>::end() {
+    return Iterator(nullptr);
+}
+
+template<typename T>
+typename List<T>::Iterator List<T>::erase(Iterator pos) {
+    Node* cur = pos.ptr;
+    if (cur == nullptr) return end();
+
+    Node* nextNode = cur->next;
+
+    if (cur == head) {
+        pop_front();
+    } else if (cur == tail) {
+        pop_back();
+    } else {
+        cur->prev->next = cur->next;
+        cur->next->prev = cur->prev;
+        delete cur;
+        sz--;
+    }
+
+    return Iterator(nextNode);
 }
 
 #endif // LIST_HPP
