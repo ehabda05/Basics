@@ -23,8 +23,11 @@ class List {
     bool empty() const;
     std::size_t size() const;
     class Iterator;
+    class ConstIterator;
     Iterator begin();
     Iterator end();
+    ConstIterator begin() const;
+    ConstIterator end() const;
     void erase(const T& value);
     Iterator erase(Iterator pos);
   private:
@@ -62,6 +65,33 @@ class List<T>::Iterator{
         return ptr == other.ptr;
     }
     bool operator!=(const Iterator& other) const {
+        return ptr != other.ptr;
+    }
+
+  private:
+    Node* ptr;
+    friend class List<T>;
+};
+
+template<typename T>
+class List<T>::ConstIterator{
+  public:
+    ConstIterator(Node* p) : ptr(p) {}
+    const T& operator*() const {
+        return ptr->val;
+    }
+    ConstIterator& operator++() {
+        ptr = ptr->next;
+        return *this;
+    }
+    ConstIterator& operator--() {
+        ptr = ptr->prev;
+        return *this;
+    }
+    bool operator==(const ConstIterator& other) const {
+        return ptr == other.ptr;
+    }
+    bool operator!=(const ConstIterator& other) const {
         return ptr != other.ptr;
     }
 
@@ -251,6 +281,16 @@ typename List<T>::Iterator List<T>::erase(Iterator pos) {
     }
 
     return Iterator(nextNode);
+}
+
+template<typename T>
+typename List<T>::ConstIterator List<T>::begin() const {
+    return ConstIterator(head);
+}
+
+template<typename T>
+typename List<T>::ConstIterator List<T>::end() const {
+    return ConstIterator(nullptr);
 }
 
 #endif // LIST_HPP

@@ -8,6 +8,7 @@ template<typename T>
 class Vector {
   public:
     Vector();
+    Vector(std::size_t count);
     ~Vector();
     Vector(const Vector<T>& other);
     Vector<T>& operator=(const Vector<T>& other);
@@ -15,6 +16,10 @@ class Vector {
     void pop_back();
     T& back();
     const T& back() const;
+    T* begin();
+    T* end();
+    const T* begin() const;
+    const T* end() const;
     std::size_t size() const;
     T& operator[](std::size_t index);
     const T& operator[](std::size_t index) const;
@@ -31,6 +36,11 @@ class Vector {
 
 template<typename T>
 Vector<T>::Vector() : data(nullptr), sz(0), capacity(0) {}
+
+template<typename T>
+Vector<T>::Vector(std::size_t count) : data(nullptr), sz(count), capacity(count) {
+    if (capacity > 0) data = new T[capacity];
+}
 
 template<typename T>
 Vector<T>::~Vector() {delete[] data;}
@@ -87,6 +97,26 @@ const T& Vector<T>::back() const {
         throw std::out_of_range("Vector is empty\n");
     }
     return data[sz-1];
+}
+
+template<typename T>
+T* Vector<T>::begin() {
+    return data;
+}
+
+template<typename T>
+T* Vector<T>::end() {
+    return data + sz;
+}
+
+template<typename T>
+const T* Vector<T>::begin() const {
+    return data;
+}
+
+template<typename T>
+const T* Vector<T>::end() const {
+    return data + sz;
 }
 
 template<typename T>
