@@ -9,7 +9,7 @@ template<typename T>
 class UniquePtr {
   public:
     UniquePtr();
-    explicit UniquePtr(T* ptr);
+    explicit UniquePtr(T* p);
     ~UniquePtr();
 
     UniquePtr(const UniquePtr<T>& other) = delete;
@@ -28,14 +28,14 @@ class UniquePtr {
     explicit operator bool() const;
 
   private:
-    T* data;
+    T* ptr;
 };
 
 template<typename T>
 class SharedPtr {
   public:
     SharedPtr();
-    explicit SharedPtr(T* ptr);
+    explicit SharedPtr(T* p);
     ~SharedPtr();
 
     SharedPtr(const SharedPtr<T>& other);
@@ -54,9 +54,74 @@ class SharedPtr {
     explicit operator bool() const;
 
   private:
-    T* data;
+    T* ptr;
     std::size_t* count;
     void release();
 };
+
+template<typename T>
+UniquePtr<T>::UniquePtr() : ptr(nullptr) {}
+
+template<typename T>
+UniquePtr<T>::UniquePtr(T* p) : ptr(p){
+}
+
+template<typename T>
+UniquePtr<T>::~UniquePtr() {
+    delete ptr;
+}
+
+template<typename T>
+UniquePtr<T>::UniquePtr(UniquePtr<T>&& other) noexcept : ptr(other.ptr) {
+    other.ptr = nullptr;
+}
+
+template<typename T>
+UniquePtr<T>& UniquePtr<T>::operator=(UniquePtr<T>&& other) noexcept {
+    if (this == &other) return *this;
+
+    delete ptr;
+    ptr = other.ptr;
+    other.ptr = nullptr;
+
+    return *this;
+}
+
+template<typename T>
+T& UniquePtr<T>::operator*() const {
+    if (!ptr) throw std::runtime_error("Dereferencing null UniquePtr");
+    return *ptr;
+}
+
+template<typename T>
+T* UniquePtr<T>::operator->() const {
+    if (!ptr) throw std::runtime_error("Dereferencing null UniquePtr");
+    return ptr;
+}
+
+template<typename T>
+T* UniquePtr<T>::get() const {
+    return ptr;
+}
+
+template<typename T>
+T* UniquePtr<T>::release() {
+    T* temp = ptr;
+    ptr = nullptr;
+    return temp;
+}
+
+template<typename T>
+void UniquePtr<T>::reset(T* newPtr) {
+    if (ptr != newPtr) {
+        delete ptr;
+        ptr = newPtr;
+    }
+}
+
+template<typename T>
+UniquePtr<T>::operator bool() const {
+    return ptr != nullptr;
+}
 
 #endif // SMARTPOINTERS_HPP
