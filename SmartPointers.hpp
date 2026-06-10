@@ -32,6 +32,9 @@ class UniquePtr {
 };
 
 template<typename T>
+class WeakPtr;
+
+template<typename T>
 class SharedPtr {
   public:
     SharedPtr();
@@ -54,8 +57,42 @@ class SharedPtr {
     explicit operator bool() const;
 
   private:
+    struct ControlBlock {
+        std::size_t strong_count;
+        std::size_t weak_count;
+
+        ControlBlock() : strong_count(1), weak_count(0) {}
+    };
+
     T* ptr;
-    std::size_t* count;
+    ControlBlock* control;
+    void release();
+    friend class WeakPtr<T>;
+};
+
+template<typename T>
+class WeakPtr {
+  public:
+    WeakPtr();
+    WeakPtr(const SharedPtr<T>& shared);
+    ~WeakPtr();
+
+    WeakPtr(const WeakPtr<T>& other);
+    WeakPtr<T>& operator=(const WeakPtr<T>& other);
+
+    WeakPtr(WeakPtr<T>&& other) noexcept;
+    WeakPtr<T>& operator=(WeakPtr<T>&& other) noexcept;
+
+    SharedPtr<T> lock() const;
+
+    bool expired() const;
+    std::size_t use_count() const;
+
+    void reset();
+
+  private:
+    T* ptr;
+    typename SharedPtr<T>::ControlBlock* control;
     void release();
 };
 
@@ -124,12 +161,11 @@ UniquePtr<T>::operator bool() const {
 }
 
 template<typename T>
-SharedPtr<T>::SharedPtr() : ptr(nullptr), count(nullptr) {}
+SharedPtr<T>::SharedPtr() : ptr(nullptr), control(nullptr) {}
 
 template<typename T>
-SharedPtr<T>::SharedPtr(T* p) : ptr(p) {
-    if (p) count = new std::size_t(1);
-    else count = nullptr;
+SharedPtr<T>::SharedPtr(T* p) : ptr(p), control(nullptr) {
+    if (p) control = new ControlBlock();
 }
 
 template<typename T>
@@ -138,8 +174,8 @@ SharedPtr<T>::~SharedPtr() {
 }
 
 template<typename T>
-SharedPtr<T>::SharedPtr(const SharedPtr<T>& other) : ptr(other.ptr), count(other.count) {
-    if (count) ++(*count);
+SharedPtr<T>::SharedPtr(const SharedPtr<T>& other) : ptr(other.ptr), control(other.control) {
+    if (control) control->strong_count++;
 }
 
 template<typename T>
@@ -149,16 +185,16 @@ SharedPtr<T>& SharedPtr<T>::operator=(const SharedPtr<T>& other) {
     release();
 
     ptr = other.ptr;
-    count = other.count;
-    if (count) ++(*count);
+    control = other.control;
+    if (control) control->strong_count++;
 
     return *this;
 }
 
 template<typename T>
-SharedPtr<T>::SharedPtr(SharedPtr<T>&& other) noexcept : ptr(other.ptr), count(other.count) {
+SharedPtr<T>::SharedPtr(SharedPtr<T>&& other) noexcept : ptr(other.ptr), control(other.control) {
     other.ptr = nullptr;
-    other.count = nullptr;
+    other.control = nullptr;
 }
 
 template<typename T>
@@ -168,10 +204,10 @@ SharedPtr<T>& SharedPtr<T>::operator=(SharedPtr<T>&& other) noexcept {
     release();
 
     ptr = other.ptr;
-    count = other.count;
+    control = other.control;
 
     other.ptr = nullptr;
-    other.count = nullptr;
+    other.control = nullptr;
 
     return *this;
 }
@@ -195,7 +231,7 @@ T* SharedPtr<T>::get() const {
 
 template<typename T>
 std::size_t SharedPtr<T>::use_count() const {
-    return count ? *count : 0;
+    return control ? control->strong_count : 0;
 }
 
 template<typename T>
@@ -205,8 +241,9 @@ void SharedPtr<T>::reset(T* newPtr) {
     release();
 
     ptr = newPtr;
-    if (newPtr) count = new std::size_t(1);
-    else count = nullptr;
+    control = nullptr;
+
+    if (newPtr) control = new ControlBlock();
 }
 
 template<typename T>
@@ -216,20 +253,117 @@ SharedPtr<T>::operator bool() const {
 
 template<typename T>
 void SharedPtr<T>::release() {
-    if (!count) {
+    if (!control) {
         ptr = nullptr;
         return;
     }
 
-    --(*count);
+    control->strong_count--;
 
-    if (*count == 0) {
+    if (control->strong_count == 0) {
         delete ptr;
-        delete count;
+        ptr = nullptr;
+
+        if (control->weak_count == 0) {
+            delete control;
+        }
     }
 
     ptr = nullptr;
-    count = nullptr;
+    control = nullptr;
+}
+
+template<typename T>
+WeakPtr<T>::WeakPtr() : ptr(nullptr), control(nullptr) {}
+
+template<typename T>
+WeakPtr<T>::WeakPtr(const SharedPtr<T>& shared) : ptr(shared.ptr), control(shared.control) {
+    if (control) control->weak_count++;
+}
+
+template<typename T>
+WeakPtr<T>::~WeakPtr() {
+    release();
+}
+
+template<typename T>
+WeakPtr<T>::WeakPtr(const WeakPtr<T>& other) : ptr(other.ptr), control(other.control) {
+    if (control) control->weak_count++;
+}
+
+template<typename T>
+WeakPtr<T>& WeakPtr<T>::operator=(const WeakPtr<T>& other) {
+    if (this == &other) return *this;
+
+    release();
+
+    ptr = other.ptr;
+    control = other.control;
+    if (control) control->weak_count++;
+
+    return *this;
+}
+
+template<typename T>
+WeakPtr<T>::WeakPtr(WeakPtr<T>&& other) noexcept : ptr(other.ptr), control(other.control) {
+    other.ptr = nullptr;
+    other.control = nullptr;
+}
+
+template<typename T>
+WeakPtr<T>& WeakPtr<T>::operator=(WeakPtr<T>&& other) noexcept {
+    if (this == &other) return *this;
+
+    release();
+
+    ptr = other.ptr;
+    control = other.control;
+    other.ptr = nullptr;
+    other.control = nullptr;
+
+    return *this;
+}
+
+template<typename T>
+SharedPtr<T> WeakPtr<T>::lock() const {
+    SharedPtr<T> result;
+
+    if (control != nullptr && control->strong_count > 0) {
+        result.ptr = ptr;
+        result.control = control;
+        control->strong_count++;
+    }
+
+    return result;
+}
+
+template<typename T>
+bool WeakPtr<T>::expired() const {
+    return control == nullptr || control->strong_count == 0;
+}
+
+template<typename T>
+std::size_t WeakPtr<T>::use_count() const {
+    return control ? control->strong_count : 0;
+}
+
+template<typename T>
+void WeakPtr<T>::reset() {
+    release();
+}
+
+template<typename T>
+void WeakPtr<T>::release() {
+    if (control == nullptr) return;
+
+    control->weak_count--;
+
+    if (control->strong_count == 0 && control->weak_count == 0) {
+        delete control;
+    }
+
+    ptr = nullptr;
+    control = nullptr;
 }
 
 #endif // SMARTPOINTERS_HPP
