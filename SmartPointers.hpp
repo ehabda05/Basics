@@ -63,8 +63,7 @@ template<typename T>
 UniquePtr<T>::UniquePtr() : ptr(nullptr) {}
 
 template<typename T>
-UniquePtr<T>::UniquePtr(T* p) : ptr(p){
-}
+UniquePtr<T>::UniquePtr(T* p) : ptr(p){}
 
 template<typename T>
 UniquePtr<T>::~UniquePtr() {
@@ -122,6 +121,115 @@ void UniquePtr<T>::reset(T* newPtr) {
 template<typename T>
 UniquePtr<T>::operator bool() const {
     return ptr != nullptr;
+}
+
+template<typename T>
+SharedPtr<T>::SharedPtr() : ptr(nullptr), count(nullptr) {}
+
+template<typename T>
+SharedPtr<T>::SharedPtr(T* p) : ptr(p) {
+    if (p) count = new std::size_t(1);
+    else count = nullptr;
+}
+
+template<typename T>
+SharedPtr<T>::~SharedPtr() {
+    release();
+}
+
+template<typename T>
+SharedPtr<T>::SharedPtr(const SharedPtr<T>& other) : ptr(other.ptr), count(other.count) {
+    if (count) ++(*count);
+}
+
+template<typename T>
+SharedPtr<T>& SharedPtr<T>::operator=(const SharedPtr<T>& other) {
+    if (this == &other) return *this;
+
+    release();
+
+    ptr = other.ptr;
+    count = other.count;
+    if (count) ++(*count);
+
+    return *this;
+}
+
+template<typename T>
+SharedPtr<T>::SharedPtr(SharedPtr<T>&& other) noexcept : ptr(other.ptr), count(other.count) {
+    other.ptr = nullptr;
+    other.count = nullptr;
+}
+
+template<typename T>
+SharedPtr<T>& SharedPtr<T>::operator=(SharedPtr<T>&& other) noexcept {
+    if (this == &other) return *this;
+
+    release();
+
+    ptr = other.ptr;
+    count = other.count;
+
+    other.ptr = nullptr;
+    other.count = nullptr;
+
+    return *this;
+}
+
+template<typename T>
+T& SharedPtr<T>::operator*() const {
+    if (!ptr) throw std::runtime_error("Dereferencing null SharedPtr");
+    return *ptr;
+}
+
+template<typename T>
+T* SharedPtr<T>::operator->() const {
+    if (!ptr) throw std::runtime_error("Dereferencing null SharedPtr");
+    return ptr;
+}
+
+template<typename T>
+T* SharedPtr<T>::get() const {
+    return ptr;
+}
+
+template<typename T>
+std::size_t SharedPtr<T>::use_count() const {
+    return count ? *count : 0;
+}
+
+template<typename T>
+void SharedPtr<T>::reset(T* newPtr) {
+    if (ptr == newPtr) return;
+
+    release();
+
+    ptr = newPtr;
+    if (newPtr) count = new std::size_t(1);
+    else count = nullptr;
+}
+
+template<typename T>
+SharedPtr<T>::operator bool() const {
+    return ptr != nullptr;
+}
+
+template<typename T>
+void SharedPtr<T>::release() {
+    if (!count) {
+        ptr = nullptr;
+        return;
+    }
+
+    --(*count);
+
+    if (*count == 0) {
+        delete ptr;
+        delete count;
+    }
+
+    ptr = nullptr;
+    count = nullptr;
 }
 
 #endif // SMARTPOINTERS_HPP
